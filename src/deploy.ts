@@ -1,23 +1,58 @@
 import "dotenv/config";
+import * as readline from "readline";
 import { createDroplet, waitForDroplet, listSSHKeys, addSSHKey } from "./digitalocean.js";
 import { createDNSRecord } from "./cloudflare.js";
 import { getSSHPublicKey, waitForSSH, runCommands } from "./ssh.js";
+import { loadTemplate, listTemplates, type Template, type EnvVar } from "./template.js";
 
-const DOMAIN = "makeupbyshivani.com";
-const APP_NAME = "kuma"; // subdomain: kuma.makeupbyshivani.com
+const DOMAIN = process.env.DOMAIN || "makeupbyshivani.com";
+
+function prompt(question: string): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+async function collectEnvVars(envVars: EnvVar[]): Promise<Record<string, string>> {
+  const values: Record<string, string> = {};
+
+  for (const envVar of envVars) {
+    const defaultHint = envVar.default ? ` (default: ${envVar.default})` : "";
+    const requiredHint = envVar.required ? " *" : "";
+    const answer = await prompt(`${envVar.label}${requiredHint}${defaultHint}: `);
+
+    const value = answer.trim() || envVar.default || "";
+
+    if (envVar.required && !value) {
+      throw new Error(`${envVar.label} is required`);
+    }
+
+    if (value) {
+      values[envVar.key] = value;
+    }
+  }
+
+  return values;
+}
 
 async function ensureSSHKey(): Promise<string> {
   const publicKey = getSSHPublicKey();
   const keys = await listSSHKeys();
 
-  // Check if our key is already registered
   const existing = keys.find((k) => k.public_key.trim() === publicKey);
   if (existing) {
     console.log(`Using existing SSH key: ${existing.name}`);
     return existing.fingerprint;
   }
 
-  // Register new key
   console.log("Registering SSH key with DigitalOcean...");
   const newKey = await addSSHKey("noxel-deploy", publicKey);
   console.log(`Registered SSH key: ${newKey.fingerprint}`);
@@ -27,23 +62,14 @@ async function ensureSSHKey(): Promise<string> {
 async function installDocker(ip: string) {
   console.log("\nInstalling Docker...");
   await runCommands(ip, [
-    // Update and install prerequisites
     "apt-get update -qq",
     "apt-get install -y -qq ca-certificates curl gnupg",
-
-    // Add Docker GPG key
     "install -m 0755 -d /etc/apt/keyrings",
     "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes",
     "chmod a+r /etc/apt/keyrings/docker.gpg",
-
-    // Add Docker repo
     `echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list`,
-
-    // Install Docker
     "apt-get update -qq",
     "apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin",
-
-    // Verify
     "docker --version",
   ]);
 }
@@ -60,37 +86,43 @@ async function installCaddy(ip: string) {
   ]);
 }
 
-async function deployUptimeKuma(ip: string, domain: string) {
-  console.log("\nDeploying Uptime Kuma...");
+async function deployApp(
+  ip: string,
+  template: Template,
+  subdomain: string,
+  envVars: Record<string, string>
+) {
+  const appDir = `/opt/${subdomain}`;
+  const fullDomain = `${subdomain}.${DOMAIN}`;
 
-  // Create docker-compose file
-  const compose = `
-services:
-  uptime-kuma:
-    image: louislam/uptime-kuma:1
-    container_name: uptime-kuma
-    restart: unless-stopped
-    ports:
-      - "3001:3001"
-    volumes:
-      - uptime-kuma-data:/app/data
+  console.log(`\nDeploying ${template.name}...`);
 
-volumes:
-  uptime-kuma-data:
-`;
+  // Create env file content if there are env vars
+  let envFileCommands: string[] = [];
+  if (Object.keys(envVars).length > 0) {
+    const envContent = Object.entries(envVars)
+      .map(([key, value]) => `${key}=${value}`)
+      .join("\n");
+    envFileCommands = [
+      `cat > ${appDir}/.env << 'EOF'
+${envContent}
+EOF`,
+    ];
+  }
 
   await runCommands(ip, [
-    "mkdir -p /opt/uptime-kuma",
-    `cat > /opt/uptime-kuma/docker-compose.yml << 'EOF'
-${compose}
+    `mkdir -p ${appDir}`,
+    `cat > ${appDir}/docker-compose.yml << 'EOF'
+${template.composeFile}
 EOF`,
-    "cd /opt/uptime-kuma && docker compose up -d",
+    ...envFileCommands,
+    `cd ${appDir} && docker compose up -d`,
   ]);
 
-  // Configure Caddy for reverse proxy + SSL
+  // Configure Caddy
   const caddyfile = `
-${domain} {
-    reverse_proxy localhost:3001
+${fullDomain} {
+    reverse_proxy localhost:${template.port}
 }
 `;
 
@@ -103,25 +135,46 @@ EOF`,
 }
 
 async function main() {
-  console.log("🚀 Noxel Prototype - Deploying Uptime Kuma\n");
+  const appName = process.argv[2];
 
-  // Step 1: Ensure SSH key is registered
+  if (!appName) {
+    const available = listTemplates();
+    console.log("Usage: npm run deploy -- <app-name>\n");
+    console.log("Available templates:");
+    available.forEach((t) => console.log(`  - ${t}`));
+    process.exit(1);
+  }
+
+  const template = loadTemplate(appName);
+
+  console.log(`🚀 Noxel - Deploying ${template.name}\n`);
+  console.log(`   ${template.description}`);
+  console.log(`   Source: ${template.source}\n`);
+
+  // Collect env vars if needed
+  let envVars: Record<string, string> = {};
+  if (template.env_vars.length > 0) {
+    console.log("Configuration required:\n");
+    envVars = await collectEnvVars(template.env_vars);
+    console.log("");
+  }
+
+  // Step 1: Ensure SSH key
   const sshFingerprint = await ensureSSHKey();
 
   // Step 2: Create droplet
-  const dropletName = `${APP_NAME}-${Date.now()}`;
+  const subdomain = appName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+  const dropletName = `${subdomain}-${Date.now()}`;
   console.log(`\nCreating droplet: ${dropletName}`);
   const droplet = await createDroplet(dropletName, sshFingerprint);
   console.log(`Droplet created: ID ${droplet.id}`);
 
-  // Step 3: Wait for droplet and get IP
+  // Step 3: Wait for droplet
   const ip = await waitForDroplet(droplet.id);
   console.log(`\nDroplet ready: ${ip}`);
 
   // Step 4: Create DNS record
-  const subdomain = `${APP_NAME}.${DOMAIN}`;
-  await createDNSRecord(APP_NAME, ip);
-  console.log(`DNS configured: ${subdomain} → ${ip}`);
+  await createDNSRecord(subdomain, ip);
 
   // Step 5: Wait for SSH
   await waitForSSH(ip);
@@ -133,12 +186,13 @@ async function main() {
   await installCaddy(ip);
 
   // Step 8: Deploy app
-  await deployUptimeKuma(ip, subdomain);
+  await deployApp(ip, template, subdomain, envVars);
 
   // Done!
+  const fullDomain = `${subdomain}.${DOMAIN}`;
   console.log("\n" + "=".repeat(50));
-  console.log("✅ Deployment complete!");
-  console.log(`\n🌐 Your app is live at: https://${subdomain}`);
+  console.log(`✅ ${template.name} deployed!`);
+  console.log(`\n🌐 Live at: https://${fullDomain}`);
   console.log(`📍 Server IP: ${ip}`);
   console.log(`🔑 SSH: ssh root@${ip}`);
   console.log("=".repeat(50));
