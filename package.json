@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "deploy": "tsx src/deploy.ts",
-    "destroy": "tsx src/destroy.ts"
+    "deploy": "tsx prototype/deploy.ts",
+    "destroy": "tsx prototype/destroy.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

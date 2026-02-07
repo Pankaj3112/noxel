@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import yaml from "js-yaml";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_DIR = path.join(__dirname, "..", "templates");
+const TEMPLATES_DIR = path.join(__dirname, "templates");
 
 export interface EnvVar {
   key: string;
