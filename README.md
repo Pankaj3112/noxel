@@ -153,7 +153,7 @@ npm install
 
 # Set up environment
 cp .env.example .env
-# Add your tokens to .env
+# Add your tokens to .env (see docs/setup-env.md for how to get them)
 
 # Run prototype
 npm run deploy -- uptime-kuma
