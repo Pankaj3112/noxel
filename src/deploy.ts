@@ -5,7 +5,7 @@ import { createDNSRecord } from "./cloudflare.js";
 import { getSSHPublicKey, waitForSSH, runCommands } from "./ssh.js";
 import { loadTemplate, listTemplates, type Template, type EnvVar } from "./template.js";
 
-const DOMAIN = process.env.DOMAIN || "makeupbyshivani.com";
+const DOMAIN = process.env.DOMAIN;
 
 function prompt(question: string): Promise<string> {
   const rl = readline.createInterface({

@@ -17,7 +17,11 @@ function getZoneId(): string {
 }
 
 function getDomain(): string {
-  return process.env.DOMAIN || "makeupbyshivani.com";
+  if (!process.env.DOMAIN) {
+    throw new Error("DOMAIN not set in .env");
+  }
+
+  return process.env.DOMAIN;
 }
 
 async function cfFetch(path: string, options: RequestInit = {}) {
@@ -45,7 +49,7 @@ export async function createDNSRecord(subdomain: string, ip: string) {
 
   // First check if record already exists
   const existing = await cfFetch(
-    `/zones/${zoneId}/dns_records?type=A&name=${fullDomain}`
+    `/zones/${zoneId}/dns_records?type=A&name=${fullDomain}`,
   );
 
   if (existing.result.length > 0) {
@@ -83,7 +87,7 @@ export async function deleteDNSRecord(subdomain: string) {
   const fullDomain = `${subdomain}.${getDomain()}`;
 
   const existing = await cfFetch(
-    `/zones/${zoneId}/dns_records?type=A&name=${fullDomain}`
+    `/zones/${zoneId}/dns_records?type=A&name=${fullDomain}`,
   );
 
   for (const record of existing.result) {
