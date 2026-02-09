@@ -6,6 +6,8 @@ import { destroyCommand } from "./commands/destroy.js";
 import { listCommand } from "./commands/list.js";
 import { statusCommand } from "./commands/status.js";
 import { templatesCommand } from "./commands/templates.js";
+import { domainAddCommand, domainVerifyCommand } from "./commands/domain.js";
+import { logoutCommand } from "./commands/logout.js";
 
 const program = new Command();
 
@@ -43,5 +45,25 @@ program
   .command("templates")
   .description("List available app templates")
   .action(templatesCommand);
+
+const domain = program
+  .command("domain")
+  .description("Manage custom domains");
+
+domain
+  .command("add <domain>")
+  .requiredOption("--app <name>", "Deployment name (from noxel list)")
+  .description("Show CNAME instructions for a custom domain")
+  .action(domainAddCommand);
+
+domain
+  .command("verify <domain>")
+  .description("Verify CNAME and configure SSL")
+  .action(domainVerifyCommand);
+
+program
+  .command("logout")
+  .description("Remove stored credentials")
+  .action(logoutCommand);
 
 program.parse();
