@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Hono } from "hono";
-import Database from "better-sqlite3";
-import { createDb, createUser, getSubdomain } from "../db.js";
-import { createDnsRoutes } from "./dns.js";
+import { createTestDb } from "../test-utils.js";
+import { createUser, getSubdomain } from "../db.js";
+import { dnsRoutes } from "./dns.js";
 import { authMiddleware } from "../middleware.js";
+import type { Bindings } from "../worker.js";
 
 // Mock cloudflare module
 vi.mock("../cloudflare.js", () => ({
@@ -12,18 +13,25 @@ vi.mock("../cloudflare.js", () => ({
 }));
 
 describe("DNS routes", () => {
-  let db: Database.Database;
-  let app: Hono;
+  let db: D1Database;
+  let app: Hono<{ Bindings: Bindings }>;
   let apiKey: string;
 
-  beforeEach(() => {
-    db = createDb(":memory:");
-    const user = createUser(db, { email: "test@example.com", doAccountId: "do-123" });
+  beforeEach(async () => {
+    db = createTestDb();
+    const user = await createUser(db, { email: "test@example.com", doAccountId: "do-123" });
     apiKey = user.api_key;
 
-    app = new Hono();
-    app.use("/dns/*", authMiddleware(db));
-    app.route("/dns", createDnsRoutes(db, "noxel.sh"));
+    app = new Hono<{ Bindings: Bindings }>();
+
+    // Inject test env bindings
+    app.use("/*", async (c, next) => {
+      c.env = { ...c.env, DB: db, DOMAIN: "noxel.sh" } as Bindings;
+      await next();
+    });
+
+    app.use("/dns/*", authMiddleware);
+    app.route("/dns", dnsRoutes);
   });
 
   it("POST /dns allocates a subdomain", async () => {
@@ -74,7 +82,7 @@ describe("DNS routes", () => {
     });
 
     expect(delRes.status).toBe(200);
-    expect(getSubdomain(db, subdomain)).toBeNull();
+    expect(await getSubdomain(db, subdomain)).toBeNull();
   });
 
   it("DELETE /dns/:subdomain returns 404 for unknown subdomain", async () => {

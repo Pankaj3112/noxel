@@ -1,17 +1,25 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Hono } from "hono";
-import Database from "better-sqlite3";
-import { createDb, createUser } from "./db.js";
+import { createTestDb } from "./test-utils.js";
+import { createUser } from "./db.js";
 import { authMiddleware } from "./middleware.js";
+import type { Bindings } from "./worker.js";
 
 describe("auth middleware", () => {
-  let db: Database.Database;
-  let app: Hono;
+  let db: D1Database;
+  let app: Hono<{ Bindings: Bindings }>;
 
   beforeEach(() => {
-    db = createDb(":memory:");
-    app = new Hono();
-    app.use("/*", authMiddleware(db));
+    db = createTestDb();
+    app = new Hono<{ Bindings: Bindings }>();
+
+    // Inject test DB into env
+    app.use("/*", async (c, next) => {
+      c.env = { ...c.env, DB: db } as Bindings;
+      await next();
+    });
+
+    app.use("/*", authMiddleware);
     app.get("/test", (c) => c.json({ userId: c.get("userId") }));
   });
 
@@ -28,7 +36,7 @@ describe("auth middleware", () => {
   });
 
   it("allows request with valid api key and sets userId", async () => {
-    const user = createUser(db, { email: "test@example.com", doAccountId: "do-123" });
+    const user = await createUser(db, { email: "test@example.com", doAccountId: "do-123" });
     const res = await app.request("/test", {
       headers: { Authorization: `Bearer ${user.api_key}` },
     });

@@ -25,12 +25,8 @@ const TEMPLATES = [
   },
 ];
 
-export function createTemplateRoutes(): Hono {
-  const app = new Hono();
+export const templateRoutes = new Hono();
 
-  app.get("/", (c) => {
-    return c.json({ templates: TEMPLATES });
-  });
-
-  return app;
-}
+templateRoutes.get("/", (c) => {
+  return c.json({ templates: TEMPLATES });
+});

@@ -1,13 +1,33 @@
 {
-  "name": "noxel",
+  "name": "@noxel/cli",
   "version": "0.1.0",
+  "description": "Deploy open-source apps in minutes",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "noxel": "./dist/cli.js"
   },
+  "files": [
+    "dist/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/noxel-sh/noxel"
+  },
+  "keywords": [
+    "noxel",
+    "deploy",
+    "self-hosted",
+    "digitalocean",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsc && cp -r src/templates dist/",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest"
   },
