@@ -9,7 +9,7 @@ node_modules/
 dist/
 
 # API
-api/noxel.db
+api/noxel.db*
 api/.env
 api/dist/
 

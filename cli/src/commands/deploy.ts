@@ -201,6 +201,7 @@ export async function deployCommand(appName?: string): Promise<void> {
 
 async function installDocker(ip: string): Promise<void> {
   await runCommands(ip, [
+    "cloud-init status --wait",
     "apt-get update -qq",
     "apt-get install -y -qq ca-certificates curl gnupg",
     "install -m 0755 -d /etc/apt/keyrings",
