@@ -9,4 +9,4 @@ DOMAIN = "noxel.sh"
 [[d1_databases]]
 binding = "DB"
 database_name = "noxel-db"
-database_id = ""  # fill after `wrangler d1 create noxel-db`
+database_id = "7fb6de7a-d109-4386-b0e4-e89711d1e582"

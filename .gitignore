@@ -22,3 +22,5 @@ cli/dist/
 # IDE
 .idea/
 .vscode/
+
+.wrangler/
