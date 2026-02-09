@@ -198,7 +198,14 @@ async function main() {
   console.log("=".repeat(50));
 }
 
-main().catch((err) => {
-  console.error("\n❌ Deployment failed:", err.message);
-  process.exit(1);
-});
+const isDirectRun =
+  process.argv[1]?.includes("deploy.ts") ||
+  process.argv[1]?.includes("deploy.js");
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error("\nDeployment failed:", err.message);
+    process.exit(1);
+  });
+}
+
+export default main;

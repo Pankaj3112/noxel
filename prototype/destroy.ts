@@ -1,19 +1,13 @@
 import "dotenv/config";
+import { getDigitalOceanToken } from "./auth/refresh.js";
 import { deleteDNSRecord } from "./cloudflare.js";
 
 const API_BASE = "https://api.digitalocean.com/v2";
 
-function getToken(): string {
-  const token = process.env.DIGITALOCEAN_API_TOKEN;
-  if (!token || token === "your_token_here") {
-    throw new Error("DIGITALOCEAN_API_TOKEN not set in .env");
-  }
-  return token;
-}
-
 async function listDroplets() {
+  const token = await getDigitalOceanToken();
   const res = await fetch(`${API_BASE}/droplets?tag_name=noxel-prototype`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
   return data.droplets as Array<{
@@ -24,9 +18,10 @@ async function listDroplets() {
 }
 
 async function deleteDroplet(id: number, name: string) {
+  const token = await getDigitalOceanToken();
   const res = await fetch(`${API_BASE}/droplets/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (res.ok || res.status === 204) {
@@ -37,7 +32,7 @@ async function deleteDroplet(id: number, name: string) {
 }
 
 async function main() {
-  console.log("🗑️  Noxel Cleanup\n");
+  console.log("Noxel Cleanup\n");
 
   const droplets = await listDroplets();
 
@@ -50,7 +45,7 @@ async function main() {
 
   for (const droplet of droplets) {
     const ip = droplet.networks.v4.find((n) => n.type === "public")?.ip_address;
-    console.log(`• ${droplet.name} (${ip})`);
+    console.log(`- ${droplet.name} (${ip})`);
   }
 
   console.log("\nDestroying...\n");
@@ -68,10 +63,17 @@ async function main() {
     }
   }
 
-  console.log("\n✅ Cleanup complete!");
+  console.log("\nCleanup complete!");
 }
 
-main().catch((err) => {
-  console.error("❌ Cleanup failed:", err.message);
-  process.exit(1);
-});
+const isDirectRun =
+  process.argv[1]?.includes("destroy.ts") ||
+  process.argv[1]?.includes("destroy.js");
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error("Cleanup failed:", err.message);
+    process.exit(1);
+  });
+}
+
+export default main;

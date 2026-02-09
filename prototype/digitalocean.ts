@@ -1,18 +1,13 @@
+import { getDigitalOceanToken } from "./auth/refresh.js";
+
 const API_BASE = "https://api.digitalocean.com/v2";
 
-function getToken(): string {
-  const token = process.env.DIGITALOCEAN_API_TOKEN;
-  if (!token || token === "your_token_here") {
-    throw new Error("DIGITALOCEAN_API_TOKEN not set in .env");
-  }
-  return token;
-}
-
 async function doFetch(path: string, options: RequestInit = {}) {
+  const token = await getDigitalOceanToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${getToken()}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...options.headers,
     },
@@ -31,8 +26,8 @@ export async function createDroplet(name: string, sshKeyFingerprint: string) {
     method: "POST",
     body: JSON.stringify({
       name,
-      region: "blr1", // Bangalore - closest to India
-      size: "s-1vcpu-1gb", // $6/mo - smallest
+      region: "blr1",
+      size: "s-1vcpu-1gb",
       image: "ubuntu-24-04-x64",
       ssh_keys: [sshKeyFingerprint],
       tags: ["noxel-prototype"],
@@ -71,7 +66,7 @@ export async function waitForDroplet(id: number): Promise<string> {
       }
     }
 
-    await new Promise((r) => setTimeout(r, 5000)); // wait 5s
+    await new Promise((r) => setTimeout(r, 5000));
     process.stdout.write(".");
   }
 
@@ -101,10 +96,11 @@ export async function addSSHKey(name: string, publicKey: string) {
 }
 
 export async function deleteDroplet(id: number) {
+  const token = await getDigitalOceanToken();
   await fetch(`${API_BASE}/droplets/${id}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${getToken()}`,
+      Authorization: `Bearer ${token}`,
     },
   });
 }

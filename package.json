@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "noxel": "tsx prototype/cli.ts",
     "deploy": "tsx prototype/deploy.ts",
     "destroy": "tsx prototype/destroy.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
     "js-yaml": "^4.1.0",
+    "open": "^11.0.0",
     "ssh2": "^1.15.0"
   },
   "devDependencies": {

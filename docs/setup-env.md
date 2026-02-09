@@ -4,7 +4,25 @@ This guide explains how to get each required environment variable.
 
 ---
 
-## DIGITALOCEAN_API_TOKEN
+## Quick Setup: DigitalOcean (Recommended)
+
+Connect your DigitalOcean account interactively:
+
+```bash
+npm run noxel -- connect digitalocean
+```
+
+This opens your browser, you authorize Noxel, and you're done. No need to copy API tokens.
+
+Check your connection status:
+
+```bash
+npm run noxel -- status
+```
+
+---
+
+## Manual Setup: DIGITALOCEAN_API_TOKEN (Alternative)
 
 1. Go to [cloud.digitalocean.com](https://cloud.digitalocean.com)
 2. Sign up or log in
@@ -101,6 +119,16 @@ If your domain is registered elsewhere (GoDaddy, Namecheap, Vercel, etc.):
 
 ## Final .env File
 
+If using OAuth for DigitalOcean (recommended), you only need:
+
+```bash
+CLOUDFLARE_API_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+CLOUDFLARE_ZONE_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DOMAIN=yourdomain.com
+```
+
+If using manual API token instead:
+
 ```bash
 DIGITALOCEAN_API_TOKEN=dop_v1_xxxxxxxxxxxxxxxxxxxx
 CLOUDFLARE_API_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -115,6 +143,9 @@ Save this as `.env` in the project root.
 ## Verify Setup
 
 ```bash
+# Check all connections
+npm run noxel -- status
+
 # Should list available templates
 npm run deploy
 ```

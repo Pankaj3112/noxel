@@ -13,10 +13,10 @@ Replace manual API token setup with an interactive OAuth flow: `noxel connect di
 DigitalOcean supports the **Authorization Code Flow** (not device code). The CLI uses a **local redirect** approach:
 
 1. User runs `noxel connect digitalocean`
-2. CLI starts a temporary HTTP server on `localhost:9876`
-3. CLI opens browser to DO's OAuth authorization URL with `client_id`, `redirect_uri=http://localhost:9876/callback`, `response_type=code`, `scope=read write`
+2. CLI starts a temporary HTTP server on `localhost:19847`
+3. CLI opens browser to DO's OAuth authorization URL with `client_id`, `redirect_uri=http://localhost:19847/callback`, `response_type=code`, `scope=read write`
 4. User authorizes Noxel on DigitalOcean's page
-5. DO redirects to `http://localhost:9876/callback?code=AUTH_CODE`
+5. DO redirects to `http://localhost:19847/callback?code=AUTH_CODE`
 6. CLI exchanges the auth code for an access token + refresh token via `POST /v1/oauth/token`
 7. CLI stores tokens in `~/.noxel/credentials.json`
 8. CLI shuts down the local server and confirms connection
@@ -73,7 +73,7 @@ DigitalOcean supports the **Authorization Code Flow** (not device code). The CLI
 | Scenario | Handling |
 |----------|----------|
 | User denies authorization | Show message, shut down server |
-| Port 9876 in use | Try ports 9876-9878, then error |
+| Port 19847 in use | Show error suggesting to free the port |
 | Browser doesn't open | Print URL to terminal as fallback |
 | User never authorizes | 2-minute timeout |
 | Token refresh fails | Clear credentials, prompt re-connect |
