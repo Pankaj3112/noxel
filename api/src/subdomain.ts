@@ -1,9 +1,11 @@
 const CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-function randomSuffix(length = 3): string {
+function randomSuffix(length = 6): string {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
   let result = "";
   for (let i = 0; i < length; i++) {
-    result += CHARS[Math.floor(Math.random() * CHARS.length)];
+    result += CHARS[array[i] % CHARS.length];
   }
   return result;
 }

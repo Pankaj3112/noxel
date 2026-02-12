@@ -100,6 +100,8 @@ export function execSSH(
       username: "root",
       privateKey: fs.readFileSync(getSSHKeyPath()),
       readyTimeout: timeout,
+      // TODO: Implement proper host key verification (store fingerprint on first connect)
+      hostVerifier: () => true,
     });
   });
 }

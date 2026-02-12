@@ -6,10 +6,11 @@ import {
   saveCredentials,
   saveDeployment,
 } from "../lib/credentials.js";
-import { refreshDoToken, allocateDns } from "../lib/api.js";
+import { refreshDoToken, allocateDns, deleteDns } from "../lib/api.js";
 import {
   createDroplet,
   waitForDroplet,
+  deleteDroplet,
   listSSHKeys,
   addSSHKey,
   REGIONS,
@@ -123,6 +124,10 @@ export async function deployCommand(appName?: string): Promise<void> {
   const startTime = Date.now();
   const spinner = p.spinner();
 
+  // Track created resources for cleanup on failure
+  let createdDropletId: number | null = null;
+  let allocatedSubdomain: string | null = null;
+
   try {
     // Ensure SSH key
     spinner.start("Checking SSH key...");
@@ -142,6 +147,7 @@ export async function deployCommand(appName?: string): Promise<void> {
     spinner.message("Creating server on DigitalOcean...");
     const dropletName = `noxel-${template.name.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
     const droplet = await createDroplet(doToken, dropletName, sshFingerprint, region as string);
+    createdDropletId = droplet.id;
 
     // Wait for droplet
     spinner.message("Waiting for server to be ready...");
@@ -151,6 +157,7 @@ export async function deployCommand(appName?: string): Promise<void> {
     spinner.message("Setting up DNS...");
     const slugName = template.name.toLowerCase().replace(/\s+/g, "-");
     const dns = await allocateDns(creds.noxel_api_key, slugName, ip);
+    allocatedSubdomain = dns.subdomain;
 
     // Wait for SSH
     spinner.message("Connecting to server...");
@@ -194,6 +201,25 @@ export async function deployCommand(appName?: string): Promise<void> {
   } catch (err) {
     spinner.stop("Deployment failed");
     p.log.error((err as Error).message);
+
+    // Clean up partially created resources
+    if (allocatedSubdomain) {
+      try {
+        await deleteDns(creds.noxel_api_key, allocatedSubdomain);
+        p.log.info("Cleaned up DNS record.");
+      } catch {
+        p.log.warn(`Failed to clean up DNS record: ${allocatedSubdomain}`);
+      }
+    }
+
+    if (createdDropletId) {
+      try {
+        await deleteDroplet(doToken, createdDropletId);
+        p.log.info("Cleaned up DigitalOcean droplet.");
+      } catch {
+        p.log.warn(`Failed to clean up droplet ${createdDropletId}. Delete it manually in your DigitalOcean dashboard.`);
+      }
+    }
   }
 }
 
@@ -231,29 +257,32 @@ async function deployApp(
   envVars: Record<string, string>
 ): Promise<void> {
   const appDir = `/opt/${subdomain}`;
+  const heredocDelimiter = `NOXEL_ENV_EOF_${Date.now()}`;
 
   let envFileCommands: string[] = [];
   if (Object.keys(envVars).length > 0) {
     const envContent = Object.entries(envVars)
-      .map(([key, value]) => `${key}=${value}`)
+      .map(([key, value]) => `${key}="${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
       .join("\n");
     envFileCommands = [
-      `cat > ${appDir}/.env << 'EOF'\n${envContent}\nEOF`,
+      `cat > ${appDir}/.env << '${heredocDelimiter}'\n${envContent}\n${heredocDelimiter}`,
     ];
   }
 
+  const composeDelimiter = `NOXEL_COMPOSE_EOF_${Date.now()}`;
   await runCommands(ip, [
     `mkdir -p ${appDir}`,
-    `cat > ${appDir}/docker-compose.yml << 'EOF'\n${template.composeFile}\nEOF`,
+    `cat > ${appDir}/docker-compose.yml << '${composeDelimiter}'\n${template.composeFile}\n${composeDelimiter}`,
     ...envFileCommands,
     `cd ${appDir} && docker compose up -d`,
   ]);
 
   // Configure Caddy
   const caddyfile = `${fullDomain} {\n    reverse_proxy localhost:${template.port}\n}`;
+  const caddyDelimiter = `NOXEL_CADDY_EOF_${Date.now()}`;
 
   await runCommands(ip, [
-    `cat > /etc/caddy/Caddyfile << 'EOF'\n${caddyfile}\nEOF`,
+    `cat > /etc/caddy/Caddyfile << '${caddyDelimiter}'\n${caddyfile}\n${caddyDelimiter}`,
     "systemctl restart caddy",
   ]);
 }

@@ -1,10 +1,9 @@
 import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { initCloudflare } from "./cloudflare.js";
 import { authMiddleware } from "./middleware.js";
 import { authRoutes } from "./routes/auth.js";
 import { dnsRoutes } from "./routes/dns.js";
 import { templateRoutes } from "./routes/templates.js";
+import { rateLimit } from "./rate-limit.js";
 
 export type Bindings = {
   DB: D1Database;
@@ -17,18 +16,6 @@ export type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.use("/*", cors());
-
-// Initialize Cloudflare config per-request from env
-app.use("/*", async (c, next) => {
-  initCloudflare({
-    apiToken: c.env.CLOUDFLARE_API_TOKEN,
-    zoneId: c.env.CLOUDFLARE_ZONE_ID,
-    domain: c.env.DOMAIN,
-  });
-  await next();
-});
-
 // Health check (no auth)
 app.get("/health", (c) => c.json({ status: "ok" }));
 
@@ -36,9 +23,13 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 app.route("/templates", templateRoutes);
 
 // Auth routes (no auth required — this IS the auth endpoint)
+// Rate limit: 10 requests per minute per IP
+app.use("/auth/*", rateLimit(10, 60_000));
 app.route("/auth", authRoutes);
 
 // DNS routes (auth required)
+// Rate limit: 30 requests per minute per IP
+app.use("/dns/*", rateLimit(30, 60_000));
 app.use("/dns/*", authMiddleware);
 app.route("/dns", dnsRoutes);
 

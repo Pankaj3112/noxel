@@ -41,7 +41,7 @@ describe("auth middleware", () => {
       headers: { Authorization: `Bearer ${user.api_key}` },
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as { userId: string };
     expect(body.userId).toBe(user.id);
   });
 });

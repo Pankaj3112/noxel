@@ -28,7 +28,9 @@ export function createTestDb(): D1Database {
     );
   `);
 
-  return {
+  // Cast through unknown to satisfy D1Database interface which may differ across versions
+  return ({
+    withSession() { return this; },
     prepare(sql: string) {
       const stmt = sqlite.prepare(sql);
       let boundArgs: unknown[] = [];
@@ -73,5 +75,5 @@ export function createTestDb(): D1Database {
     dump(): Promise<ArrayBuffer> {
       return Promise.resolve(new ArrayBuffer(0));
     },
-  } as D1Database;
+  }) as unknown as D1Database;
 }

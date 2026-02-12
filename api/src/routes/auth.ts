@@ -39,23 +39,20 @@ authRoutes.post("/digitalocean", async (c) => {
     expires_in: number;
   };
 
-  // Fetch account info
-  let email = "unknown";
-  let doAccountId: string | null = null;
-  try {
-    const accountRes = await fetch(DO_ACCOUNT_URL, {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-    if (accountRes.ok) {
-      const accountData = (await accountRes.json()) as {
-        account: { email: string; uuid: string };
-      };
-      email = accountData.account.email;
-      doAccountId = accountData.account.uuid;
-    }
-  } catch {
-    // Non-critical — continue with "unknown"
+  // Fetch account info — required to identify the user
+  const accountRes = await fetch(DO_ACCOUNT_URL, {
+    headers: { Authorization: `Bearer ${tokenData.access_token}` },
+  });
+
+  if (!accountRes.ok) {
+    return c.json({ error: "Failed to fetch DigitalOcean account info" }, 502);
   }
+
+  const accountData = (await accountRes.json()) as {
+    account: { email: string; uuid: string };
+  };
+  const email = accountData.account.email;
+  const doAccountId = accountData.account.uuid;
 
   // Create or find user
   const db = c.env.DB;

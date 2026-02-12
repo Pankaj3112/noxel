@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 import { generateSubdomain, isValidSubdomain } from "./subdomain.js";
 
 describe("subdomain", () => {
-  it("generates subdomain in format app-xxx", () => {
+  it("generates subdomain in format app-xxxxxx", () => {
     const sub = generateSubdomain("uptime-kuma");
-    expect(sub).toMatch(/^uptime-kuma-[a-z0-9]{3}$/);
+    expect(sub).toMatch(/^uptime-kuma-[a-z0-9]{6}$/);
   });
 
   it("sanitizes app name", () => {
     const sub = generateSubdomain("My App 2.0");
-    expect(sub).toMatch(/^my-app-20-[a-z0-9]{3}$/);
+    expect(sub).toMatch(/^my-app-20-[a-z0-9]{6}$/);
   });
 
   it("generates different subdomains each time", () => {

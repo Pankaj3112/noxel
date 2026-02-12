@@ -62,10 +62,15 @@ export async function waitForDroplet(token: string, id: number): Promise<string>
 }
 
 export async function deleteDroplet(token: string, id: number): Promise<void> {
-  await fetch(`${API_BASE}/droplets/${id}`, {
+  const res = await fetch(`${API_BASE}/droplets/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
+
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text();
+    throw new Error(`Failed to delete droplet: ${res.status} ${text}`);
+  }
 }
 
 export async function listSSHKeys(token: string) {

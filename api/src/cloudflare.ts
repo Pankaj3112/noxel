@@ -6,31 +6,18 @@ export interface CloudflareConfig {
   domain: string;
 }
 
-let config: CloudflareConfig;
-
-export function initCloudflare(cfg: CloudflareConfig): void {
-  config = cfg;
-}
-
-function getConfig(): CloudflareConfig {
-  if (!config) {
-    throw new Error("Cloudflare not initialized. Call initCloudflare() first.");
-  }
-  return config;
-}
-
-async function cfFetch(path: string, options: RequestInit = {}) {
-  const cfg = getConfig();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function cfFetch(config: CloudflareConfig, path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${cfg.apiToken}`,
+      Authorization: `Bearer ${config.apiToken}`,
       "Content-Type": "application/json",
       ...options.headers,
     },
   });
 
-  const data = await res.json();
+  const data = (await res.json()) as { success: boolean; errors?: unknown[]; result: unknown[] };
 
   if (!data.success) {
     throw new Error(`Cloudflare API error: ${JSON.stringify(data.errors)}`);
@@ -39,19 +26,19 @@ async function cfFetch(path: string, options: RequestInit = {}) {
   return data;
 }
 
-export async function createDNSRecord(subdomain: string, ip: string): Promise<void> {
-  const cfg = getConfig();
-  const fullDomain = `${subdomain}.${cfg.domain}`;
+export async function createDNSRecord(config: CloudflareConfig, subdomain: string, ip: string): Promise<void> {
+  const fullDomain = `${subdomain}.${config.domain}`;
 
   // Check if record already exists
   const existing = await cfFetch(
-    `/zones/${cfg.zoneId}/dns_records?type=A&name=${fullDomain}`
+    config,
+    `/zones/${config.zoneId}/dns_records?type=A&name=${fullDomain}`
   );
 
   if (existing.result.length > 0) {
     // Update existing record
     const recordId = existing.result[0].id;
-    await cfFetch(`/zones/${cfg.zoneId}/dns_records/${recordId}`, {
+    await cfFetch(config, `/zones/${config.zoneId}/dns_records/${recordId}`, {
       method: "PUT",
       body: JSON.stringify({
         type: "A",
@@ -63,7 +50,7 @@ export async function createDNSRecord(subdomain: string, ip: string): Promise<vo
     });
   } else {
     // Create new record
-    await cfFetch(`/zones/${cfg.zoneId}/dns_records`, {
+    await cfFetch(config, `/zones/${config.zoneId}/dns_records`, {
       method: "POST",
       body: JSON.stringify({
         type: "A",
@@ -76,16 +63,16 @@ export async function createDNSRecord(subdomain: string, ip: string): Promise<vo
   }
 }
 
-export async function deleteDNSRecord(subdomain: string): Promise<void> {
-  const cfg = getConfig();
-  const fullDomain = `${subdomain}.${cfg.domain}`;
+export async function deleteDNSRecord(config: CloudflareConfig, subdomain: string): Promise<void> {
+  const fullDomain = `${subdomain}.${config.domain}`;
 
   const existing = await cfFetch(
-    `/zones/${cfg.zoneId}/dns_records?type=A&name=${fullDomain}`
+    config,
+    `/zones/${config.zoneId}/dns_records?type=A&name=${fullDomain}`
   );
 
   for (const record of existing.result) {
-    await cfFetch(`/zones/${cfg.zoneId}/dns_records/${record.id}`, {
+    await cfFetch(config, `/zones/${config.zoneId}/dns_records/${record.id}`, {
       method: "DELETE",
     });
   }
