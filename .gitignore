@@ -8,9 +8,19 @@ node_modules/
 # Build output
 dist/
 
+# API
+api/noxel.db*
+api/.env
+api/dist/
+
+# CLI
+cli/dist/
+
 # OS
 .DS_Store
 
 # IDE
 .idea/
 .vscode/
+
+.wrangler/

@@ -1,0 +1,12 @@
+name = "noxel-api"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+DOMAIN = "makeupbyshivani.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "noxel-db"
+database_id = "7fb6de7a-d109-4386-b0e4-e89711d1e582"
